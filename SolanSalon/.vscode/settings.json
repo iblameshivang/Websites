@@ -1,0 +1,8 @@
+{
+  "files.exclude": {
+    "**/.bin": true,
+    "**/.vite": true,
+    "**/node_modules": true,
+    "**/dist": true
+  }
+}
