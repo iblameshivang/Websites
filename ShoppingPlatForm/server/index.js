@@ -193,7 +193,9 @@ const ALLOWED_MIME_TYPES = [
   'video/mp4', 'video/webm', 'video/quicktime'
 ];
 
-const uploadDirectory = path.join(__dirname, 'public', 'images', 'uploads');
+const uploadDirectory = process.env.VERCEL
+  ? '/tmp/uploads'
+  : path.join(__dirname, 'public', 'images', 'uploads');
 fs.mkdirSync(uploadDirectory, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
@@ -219,6 +221,11 @@ app.use('/images', (req, res, next) => {
   res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
   next();
 }, express.static(path.join(__dirname, 'public', 'images')));
+
+// On Vercel, also serve uploads from /tmp/uploads
+if (process.env.VERCEL) {
+  app.use('/images/uploads', express.static('/tmp/uploads'));
+}
 
 // ══════════════════════════════════════════
 // AUTHENTICATION API
@@ -1265,6 +1272,10 @@ app.post('/api/reviews', (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Shopverse Server running on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Shopverse Server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
