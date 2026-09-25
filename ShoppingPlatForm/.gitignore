@@ -2,10 +2,13 @@ node_modules/
 client/node_modules/
 server/node_modules/
 client/dist/
-server/data/demo.db
+.vercel/
+server/data/
 .env
 .env.local
 .env.production
 .env.*.local
 .DS_Store
+Thumbs.db
 .claude/
+*.log

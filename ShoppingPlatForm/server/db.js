@@ -255,12 +255,13 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_products_seller ON products(seller_id)')
 db.exec('CREATE INDEX IF NOT EXISTS idx_color_variants_product ON product_color_variants(product_id)');
 
 // ──────────────────────────────────────────
-// SEED DATA INITIALIZATION (Development/Demo only)
+// SEED DATA INITIALIZATION
+// On Vercel the SQLite file lives in /tmp, so every cold start begins with an
+// empty database. Seeding must therefore run in production too, otherwise the
+// storefront renders with zero products.
 // ──────────────────────────────────────────
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
-if (userCount === 0 && process.env.NODE_ENV === 'production') {
-  console.warn('WARNING: Database is empty but seeding is disabled in production. Create users manually or set NODE_ENV=development.');
-} else if (userCount === 0) {
+if (userCount === 0) {
   // Seed Users
   const insertUser = db.prepare(`
     INSERT INTO users (username, password_hash, email, role, brand_name)

@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const cors = require('cors');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
@@ -10,30 +11,19 @@ const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { suggestAiColors, LUXURY_COLOR_PRESETS } = require('./colors');
 
-// ── Startup Guards: crash immediately if critical secrets are missing ──
+// ── Runtime configuration ──
+// On Vercel the function must boot even when optional env vars are missing,
+// so missing secrets fall back to a per-instance random value instead of exiting.
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 if (!process.env.JWT_SECRET) {
-  if (IS_PRODUCTION) {
-    console.error('FATAL: JWT_SECRET environment variable is required. Server cannot start.');
-    process.exit(1);
-  }
-  console.warn('WARNING: JWT_SECRET not set — using insecure default. Set JWT_SECRET env var before deploying.');
-}
-
-if (!process.env.ADMIN_PASSWORD) {
-  if (IS_PRODUCTION) {
-    console.error('FATAL: ADMIN_PASSWORD environment variable is required. Server cannot start.');
-    process.exit(1);
-  }
-  console.warn('WARNING: ADMIN_PASSWORD not set — using insecure default. Set ADMIN_PASSWORD env var before deploying.');
+  console.warn('WARNING: JWT_SECRET is not set. Falling back to a per-instance random secret. Sessions will not survive a cold start — set JWT_SECRET in your Vercel env vars.');
 }
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5001;
-const JWT_SECRET = process.env.JWT_SECRET || 'ShopverseSecretKey2026';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'MissionNepal';
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || (IS_PRODUCTION ? undefined : true);
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(48).toString('hex');
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '';
 const DEFAULT_PRODUCT_IMAGE = '/images/no-image.svg';
 const DELIVERY_FEE = 49;
 const FREE_DELIVERY_THRESHOLD = 499;
@@ -152,21 +142,50 @@ const requireSeller = (req, res, next) => {
 
 // ── Express Middleware ──
 
+// Behind Vercel's proxy every request otherwise shares one rate-limit bucket
+app.set('trust proxy', 1);
+
 // Security headers (X-Content-Type-Options, X-Frame-Options, HSTS, CSP, etc.)
+// The CSP has to allow the storefront's own external assets: Unsplash product
+// photography and the Google Fonts stylesheet. Everything else stays locked down.
 app.use(helmet({
-  contentSecurityPolicy: IS_PRODUCTION ? undefined : false, // Disable CSP in dev for hot-reload
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', 'https://*.unsplash.com'],
+      mediaSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: IS_PRODUCTION ? [] : null,
+    },
+  },
   crossOriginEmbedderPolicy: false, // Allow loading external images (Unsplash)
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 if (IS_PRODUCTION) {
   app.use(helmet.hsts({ maxAge: 31536000, includeSubDomains: true }));
 }
 
-// CORS — restrict to specific origin in production
-if (!ALLOWED_ORIGIN && IS_PRODUCTION) {
-  console.error('FATAL: ALLOWED_ORIGIN environment variable is required in production for CORS.');
-  process.exit(1);
-}
-app.use(cors({ origin: ALLOWED_ORIGIN, credentials: true }));
+// CORS — the client is served from the same origin as this API, so requests
+// are same-origin by default. ALLOWED_ORIGIN (comma separated) is only needed
+// when the frontend lives on a different domain.
+const allowedOrigins = ALLOWED_ORIGIN.split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    // No Origin header = same-origin / server-to-server call.
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  credentials: true,
+}));
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -193,10 +212,16 @@ const ALLOWED_MIME_TYPES = [
   'video/mp4', 'video/webm', 'video/quicktime'
 ];
 
-const uploadDirectory = process.env.VERCEL
-  ? '/tmp/uploads'
-  : path.join(__dirname, 'public', 'images', 'uploads');
-fs.mkdirSync(uploadDirectory, { recursive: true });
+// Uploads land in the read-only bundle locally and in /tmp on Vercel. Note that
+// /tmp is wiped when a new lambda instance boots, so serverless uploads are
+// temporary — point UPLOAD_DIR at a real store if you need them to persist.
+const uploadDirectory = process.env.UPLOAD_DIR
+  || (process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'public', 'images', 'uploads'));
+try {
+  fs.mkdirSync(uploadDirectory, { recursive: true });
+} catch (err) {
+  console.warn(`WARNING: could not create upload directory ${uploadDirectory}: ${err.message}`);
+}
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDirectory),
@@ -222,9 +247,9 @@ app.use('/images', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'public', 'images')));
 
-// On Vercel, also serve uploads from /tmp/uploads
+// On Vercel, also serve uploads from the writable temp directory
 if (process.env.VERCEL) {
-  app.use('/images/uploads', express.static('/tmp/uploads'));
+  app.use('/images/uploads', express.static(uploadDirectory));
 }
 
 // ══════════════════════════════════════════

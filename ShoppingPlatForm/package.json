@@ -2,7 +2,16 @@
   "name": "shopverse",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "engines": {
     "node": "22.x"
+  },
+  "scripts": {
+    "build": "npm run build --workspace client",
+    "dev:server": "npm run start --workspace server",
+    "dev:client": "npm run dev --workspace client"
   }
 }
