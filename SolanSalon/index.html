@@ -119,6 +119,34 @@
             .team-active .single-team { padding: 0 4px; }
             .cut-active .cut-descriptions p { font-size: 19px; }
         }
+        @media (max-width: 575px) {
+            .slider-area,
+            .slider-area .single-slider,
+            .slider-area .slick-list,
+            .slider-area .slick-track { min-height: 560px; height: 100svh; max-height: 680px; }
+            .slider-area { overflow: hidden; }
+            .slider-area .single-slider { background-position: center center; }
+            .slider-area .hero__caption { width: 100%; padding: 0 8px; }
+            .slider-area .hero__caption span { margin-bottom: 14px; font-size: 13px; line-height: 1.35; letter-spacing: .07em; }
+            .slider-area .hero__caption h1 { max-width: 330px; font-size: 32px; line-height: 1.15; }
+            .slider-area .stock-text { left: 0; bottom: 112px; width: 100%; overflow: hidden; }
+            .slider-area .stock-text h2 { font-size: 48px; line-height: 1; white-space: nowrap; }
+            .slider-area .thumb-content-box { width: 100%; }
+            .slider-area .thumb-content-box .thumb-content { padding: 25px 24px 24px 28px; }
+            .slider-area .thumb-content-box .thumb-content h3 { font-size: 15px; }
+            .header-area .main-header { padding: 14px 12px 10px; }
+            .header-area .logo img { max-width: 190px; height: auto; }
+            .header-area .main-header .col-xl-10.col-lg-10.col-md-10 { position: static; }
+            .header-area .main-menu { display: block !important; position: absolute; top: 73px; left: 0; width: 100%; padding: 0 10px; }
+            .header-area .main-menu ul { display: flex; justify-content: space-between; width: 100%; margin: 0; padding: 8px 4px; background: rgba(12, 25, 42, .9); }
+            .header-area .main-menu ul li { display: block; }
+            .header-area .main-menu ul li:nth-child(2),
+            .header-area .main-menu ul li:nth-child(3) { display: none; }
+            .header-area .main-menu ul li a { padding: 6px 8px; color: #fff; font-size: 11px; letter-spacing: .04em; }
+            .header-area .main-menu ul li a::before,
+            .header-area .main-menu ul li a::after { display: none; }
+            .mobile_menu { display: none !important; }
+        }
     </style>
 </head>
 <body>
